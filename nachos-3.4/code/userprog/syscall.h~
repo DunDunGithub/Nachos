@@ -106,6 +106,8 @@ void Write(char *buffer, int size, OpenFileId id);
  */
 int Read(char *buffer, int size, OpenFileId id);
 
+int Create(char *name);
+
 /* Close the file, we're done reading and writing to it. */
 void Close(OpenFileId id);
 

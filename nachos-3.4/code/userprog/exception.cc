@@ -48,6 +48,51 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 
+// Input: - User space address (int)
+//
+// Limit of buffer (int)
+// Output:- Buffer (char*)
+// Purpose: Copy buffer from User memory space to System memory space
+char* User2System(int virtAddr,int limit)
+{
+int i;// index
+int oneChar;
+char* kernelBuf = NULL;
+kernelBuf = new char[limit +1];//need for terminal string
+if (kernelBuf == NULL)
+return kernelBuf;
+memset(kernelBuf,0,limit+1);
+//printf("\n Filename u2s:");
+for (i = 0 ; i < limit ;i++)
+{
+machine->ReadMem(virtAddr+i,1,&oneChar);
+kernelBuf[i] = (char)oneChar;
+//printf("%c",kernelBuf[i]);
+if (oneChar == 0)
+break;
+}
+return kernelBuf;
+}
+
+// Input: - User space address (int)
+//- Limit of buffer (int)
+//- Buffer (char[])
+// Output:- Number of bytes copied (int)
+// Purpose: Copy buffer from System memory space to User memory space
+int System2User(int virtAddr,int len,char* buffer)
+{
+if (len < 0) return -1;
+if (len == 0)return len;
+int i = 0;
+int oneChar = 0 ;
+do{
+oneChar= (int) buffer[i];
+machine->WriteMem(virtAddr+i,1,oneChar);
+i ++;
+}while(i < len && oneChar != 0);
+return i;
+}
+
 void ExceptionHandler(ExceptionType which)
 {
 	int type = machine->ReadRegister(2);
@@ -57,6 +102,8 @@ void ExceptionHandler(ExceptionType which)
 		case NoException:
 			return;
 		case PageFaultException:
+			printf("No valid translation found %d %d\n", which, type);
+  			ASSERT(FALSE);
 			break;
 		case ReadOnlyException:
 			break;
@@ -74,9 +121,53 @@ void ExceptionHandler(ExceptionType which)
 		case SyscallException:
 		{
 			switch(type)
-			{
+			{	
 				case SC_Halt:
+					DEBUG('a', "\n Shutdown, initiated by user program.");
+					printf ("\n\n Shutdown, initiated by user program.");
+					interrupt->Halt();
 					break;
+				case SC_Create:
+				{
+					int virtAddr;
+					char* filename;
+					DEBUG('a',"\n SC_Create call ...");
+					DEBUG('a',"\n Reading virtual address of filename");
+					// Lấy tham số tên tập tin từ thanh ghi r4
+					virtAddr = machine->ReadRegister(4);
+					DEBUG ('a',"\n Reading filename.");
+					// MaxFileLength là = 32
+					filename = User2System(virtAddr,32+1);
+					if (filename == NULL)
+					{
+					printf("\n Not enough memory in system");
+					DEBUG('a',"\n Not enough memory in system");
+					machine->WriteRegister(2,-1); // trả về lỗi cho chương
+					// trình người dùng
+					delete filename;
+					return;
+					}
+					DEBUG('a',"\n Finish reading filename.");
+					//DEBUG(‘a’,"\n File name : '"<<filename<<"'");
+					// Create file with size = 0
+					// Dùng đối tượng fileSystem của lớp OpenFile để tạo file,
+					// việc tạo file này là sử dụng các thủ tục tạo file của hệ điều
+					// hành Linux, chúng ta không quản ly trực tiếp các block trên
+					// đĩa cứng cấp phát cho file, việc quản ly các block của file
+					// trên ổ đĩa là một đồ án khác
+					if (!fileSystem->Create(filename,0))
+					{
+					printf("\n Error create file '%s'",filename);
+					machine->WriteRegister(2,-1);
+					delete filename;
+					return;
+					}
+					machine->WriteRegister(2,0); // trả về cho chương trình
+					// người dùng thành công
+					delete filename;
+					break;
+					}
+					
 				case SC_Sub:
 				{
 					op1 = machine->ReadRegister (4);
@@ -85,6 +176,9 @@ void ExceptionHandler(ExceptionType which)
 					machine->WriteRegister (2, result);
 					interrupt->Halt();
 				}
+				default:
+					printf("\n Unexpected user mode exception (%d %d)", which, type);
+					interrupt->Halt();
 			}
 		}
 	}

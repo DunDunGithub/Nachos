@@ -29,6 +29,7 @@
 #define SC_Close	8
 #define SC_Fork		9
 #define SC_Yield	10
+#define SC_ReadInt  11
 #define SC_Sub		43
 
 #ifndef IN_ASM
@@ -88,7 +89,7 @@ typedef int OpenFileId;
 #define ConsoleOutput	1  
  
 /* Create a Nachos file, with "name" */
-void Create(char *name);
+int Create(char *name);
 
 /* Open the Nachos file "name", and return an "OpenFileId" that can 
  * be used to read and write to the file.
@@ -105,6 +106,8 @@ void Write(char *buffer, int size, OpenFileId id);
  * you should always wait until you can return at least one character).
  */
 int Read(char *buffer, int size, OpenFileId id);
+
+int Create(char *name);
 
 /* Close the file, we're done reading and writing to it. */
 void Close(OpenFileId id);
@@ -126,6 +129,9 @@ void Fork(void (*func)());
 void Yield();		
 
 int Sub(int a, int b);
+
+
+int ReadInt();
 
 
 #endif /* IN_ASM */
